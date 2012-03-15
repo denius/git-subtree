@@ -139,6 +139,10 @@ OPTIONS
 	want to manipulate.  This option is mandatory
 	for all commands.
 
+-p::
+--preserve-merges::
+	Preserve merge commits.
+
 -m <message>::
 --message=<message>::
 	This option is only valid for add, merge and pull (unsure).

@@ -28,8 +28,10 @@ b,branch=     create a new branch from the split subtree
 ignore-joins  ignore prior --rejoin commits
 onto=         try connecting new tree to an existing one
 rejoin        merge the new branch back into HEAD
+p,preserve-merges instead of ignoring merges, preserve them
 options for 'add', 'merge', 'pull' and 'push'
 squash        merge subtree changes as a single commit
+p,preserve-merges instead of ignoring merges, preserve them
 "
 eval "$(echo "$OPTS_SPEC" | git rev-parse --parseopt -- "$@" || echo exit $?)"
 
@@ -48,6 +50,7 @@ ignore_joins=
 annotate=
 squash=
 message=
+preserve_merges=
 
 debug()
 {
@@ -86,7 +89,9 @@ while [ $# -gt 0 ]; do
         -b) branch="$1"; shift ;;
         -P) prefix="$1"; shift ;;
         -m) message="$1"; shift ;;
+        -p) preserve_merges=1 ;;
         --no-prefix) prefix= ;;
+        --no-preserve-merges) preserve_merges= ;;
         --onto) onto="$1"; shift ;;
         --no-onto) onto= ;;
         --rejoin) rejoin=1 ;;
@@ -477,7 +482,8 @@ copy_or_skip()
         fi
     done
 
-    if [ -n "$identical" ]; then
+    if [ -z "$preserve_merges" -a -n "$identical" -o \
+         -n "$preserve_merges" -a -n "$identical" -a -z "$nonidentical" ]; then
         echo $identical
     else
         copy_commit $rev $tree "$p" || exit $?
@@ -775,7 +781,11 @@ cmd_push()
             refspec=$(git config -f .gittrees subtree.$prefix.branch)
         fi
         echo "git push using: " $repository $refspec
-        rev=$(git subtree split --prefix=$prefix)
+        if [ -n "$preserve_merges" ]; then
+            rev=$(git subtree split --preserve-merges --prefix=$prefix)
+        else
+            rev=$(git subtree split --prefix=$prefix)
+        fi
         if [ -n "$rev" ]; then
             git push $repository $rev:refs/heads/$refspec
         else
@@ -805,7 +815,7 @@ cmd_pull-all()
 {
     git config -f .gittrees -l | grep subtree | grep path | grep -o '=.*' | grep -o '[^=].*' |
     while read path; do
-        git subtree pull -P $path $(git config -f .gittrees subtree.$path.url) $(git config -f .gittrees subtree.$path.branch) || exit $?
+        git subtree pull $([ -n "$preserve_merges" ] && echo -n "--preserve-merges") -P $path $(git config -f .gittrees subtree.$path.url) $(git config -f .gittrees subtree.$path.branch) || exit $?
     done
 }
 
@@ -813,7 +823,7 @@ cmd_push-all()
 {
     git config -f .gittrees -l | grep subtree | grep path | grep -o '=.*' | grep -o '[^=].*' |
     while read path; do
-        git subtree push -P $path $(git config -f .gittrees subtree.$path.url) $(git config -f .gittrees subtree.$path.branch) || exit $?
+        git subtree push $([ -n "$preserve_merges" ] && echo -n "--preserve-merges") -P $path $(git config -f .gittrees subtree.$path.url) $(git config -f .gittrees subtree.$path.branch) || exit $?
     done
 }
 
